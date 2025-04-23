@@ -1,0 +1,11 @@
+Django
+psycopg2-binary
+Pillow
+django-crispy-forms
+crispy-bootstrap5
+qrcode
+djangorestframework
+django-cors-headers
+python-decouple
+whitenoise
+gunicorn

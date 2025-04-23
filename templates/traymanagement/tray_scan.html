@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Scan QR Code - Kapil Agro{% endblock %}
+
+{% block extra_css %}
+<style>
+    #qr-video-container {
+        position: relative;
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto;
+        overflow: hidden;
+        border-radius: 10px;
+        border: 3px solid #198754;
+    }
+
+    #qr-video {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .scanner-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .scanner-crosshair {
+        width: 70%;
+        height: 70%;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        border-radius: 10px;
+    }
+
+    .scan-message {
+        margin-top: 10px;
+        color: white;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+
+    #qr-result-container {
+        display: none;
+        padding: 20px;
+        border-radius: 10px;
+        background-color: #f8f9fa;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        margin-top: 20px;
+    }
+
+    .spinner-border {
+        display: none;
+    }
+    
+    .camera-instructions {
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>Scan Tray QR Code</h5>
+            </div>
+            <div class="card-body">
+                <div class="camera-instructions alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> Please grant camera access permission when prompted. Position the QR code within the scanning area for best results.
+                </div>
+
+                <!-- Camera Button -->
+                <div class="text-center mb-4">
+                    <button id="start-camera" class="btn btn-lg btn-success mb-3">
+                        <i class="fas fa-camera me-2"></i> Start Camera
+                    </button>
+                </div>
+
+                <!-- Video Container -->
+                <div id="qr-video-container" style="display: none;">
+                    <video id="qr-video" playsinline></video>
+                    <div class="scanner-overlay">
+                        <div class="scanner-crosshair"></div>
+                        <div class="scan-message">Position QR code in the center</div>
+                    </div>
+                </div>
+
+                <!-- Spinner -->
+                <div class="text-center mt-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Result Container -->
+                <div id="qr-result-container" class="mt-4">
+                    <h4 class="mb-3">Scanned QR Code:</h4>
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-light p-3 border rounded flex-grow-1">
+                            <strong>Tray Number:</strong> <span id="qr-tray-number" class="ms-2 fw-bold"></span>
+                        </div>
+                    </div>
+                    <div id="qr-result-status" class="alert" role="alert"></div>
+                    <div class="d-grid gap-2">
+                        <a id="continue-link" href="#" class="btn btn-primary btn-lg">
+                            <i class="fas fa-arrow-right me-2"></i> Continue to Form
+                        </a>
+                        <button id="scan-again" class="btn btn-secondary">
+                            <i class="fas fa-sync-alt me-2"></i> Scan Another QR Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startCameraButton = document.getElementById('start-camera');
+    const videoContainer = document.getElementById('qr-video-container');
+    const video = document.getElementById('qr-video');
+    const resultContainer = document.getElementById('qr-result-container');
+    const trayNumberElement = document.getElementById('qr-tray-number');
+    const resultStatusElement = document.getElementById('qr-result-status');
+    const continueLink = document.getElementById('continue-link');
+    const scanAgainButton = document.getElementById('scan-again');
+    const spinner = document.querySelector('.spinner-border');
+    
+    let scanning = false;
+    let stream = null;
+    
+    // Start camera
+    startCameraButton.addEventListener('click', function() {
+        spinner.style.display = 'inline-block';
+        startCameraButton.style.display = 'none';
+        
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: "environment",
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            })
+            .then(function(mediaStream) {
+                stream = mediaStream;
+                video.srcObject = mediaStream;
+                video.setAttribute('playsinline', true);
+                video.play();
+                videoContainer.style.display = 'block';
+                spinner.style.display = 'none';
+                
+                scanning = true;
+                requestAnimationFrame(scanQRCode);
+            })
+            .catch(function(error) {
+                console.error("Camera error:", error);
+                spinner.style.display = 'none';
+                startCameraButton.style.display = 'block';
+                alert("Error accessing camera: " + error.message);
+            });
+        } else {
+            alert("Sorry, your browser doesn't support camera access");
+            spinner.style.display = 'none';
+            startCameraButton.style.display = 'block';
+        }
+    });
+    
+    // Scan QR Code function
+    function scanQRCode() {
+        if (!scanning) return;
+        
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const canvas = document.createElement('canvas');
+            const canvasContext = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+            
+            if (code) {
+                // Successfully scanned QR code
+                scanning = false;
+                const trayNumber = code.data;
+                
+                // Display the scanned tray number
+                trayNumberElement.textContent = trayNumber;
+                resultContainer.style.display = 'block';
+                videoContainer.style.display = 'none';
+                
+                // Check if tray exists in the system
+                checkTrayExists(trayNumber);
+            }
+        }
+        
+        if (scanning) {
+            requestAnimationFrame(scanQRCode);
+        }
+    }
+    
+    // Check if tray exists in the database
+    function checkTrayExists(trayNumber) {
+        resultStatusElement.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Checking tray...';
+        resultStatusElement.className = 'alert alert-info';
+        
+        fetch(`/api/check-tray/?tray_number=${encodeURIComponent(trayNumber)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    // Tray exists - update form
+                    resultStatusElement.innerHTML = '<i class="fas fa-info-circle me-2"></i> This tray already exists in the system. You can edit its details.';
+                    resultStatusElement.className = 'alert alert-info';
+                    continueLink.innerHTML = '<i class="fas fa-edit me-2"></i> Edit Tray Data';
+                } else {
+                    // New tray - create new entry
+                    resultStatusElement.innerHTML = '<i class="fas fa-plus-circle me-2"></i> New tray detected. Please enter the details.';
+                    resultStatusElement.className = 'alert alert-success';
+                    continueLink.innerHTML = '<i class="fas fa-plus me-2"></i> Add Tray Data';
+                }
+                continueLink.href = data.form_url;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultStatusElement.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> Error checking tray. Please try again.';
+                resultStatusElement.className = 'alert alert-danger';
+            });
+    }
+    
+    // Scan again button
+    scanAgainButton.addEventListener('click', function() {
+        resultContainer.style.display = 'none';
+        videoContainer.style.display = 'block';
+        scanning = true;
+        requestAnimationFrame(scanQRCode);
+    });
+    
+    // Clean up when leaving the page
+    window.addEventListener('beforeunload', function() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+    });
+});
+</script>
+{% endblock %}

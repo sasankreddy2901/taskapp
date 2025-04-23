@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if is_edit %}Edit{% else %}Add{% endif %} Tray Data - Kapil Agro{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0">
+                    {% if is_edit %}
+                    <i class="fas fa-edit me-2"></i>Edit Tray Data
+                    {% else %}
+                    <i class="fas fa-plus me-2"></i>Add New Tray Data
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="tray-info mb-4">
+                    <div class="alert alert-info">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-seedling fa-2x me-3"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <strong>Tray Number:</strong> {{ tray_number }}
+                                {% if is_edit %}
+                                <div class="text-muted small mt-1">Created by: {{ form.instance.user.get_full_name|default:form.instance.user.username }} on {{ form.instance.created_at|date:"d/m/Y H:i" }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <form method="post" id="trayForm">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.tray_number|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.sowing_date|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <h5 class="mt-4 mb-3 border-bottom pb-2">Cutting Details</h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.first_cutting_date|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.yield_1|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.second_cutting_date|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.yield_2|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.third_cutting_date|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.yield_3|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            {{ form.observations|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            {% if is_edit %}
+                            <i class="fas fa-save me-2"></i>Update Tray Data
+                            {% else %}
+                            <i class="fas fa-save me-2"></i>Save Tray Data
+                            {% endif %}
+                        </button>
+                        {% if user.profile.user_type == 'admin' %}
+                            <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            </a>
+                        {% else %}
+                            <a href="{% url 'user_dashboard' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const trayForm = document.getElementById('trayForm');
+    const sowingDateInput = document.getElementById('id_sowing_date');
+    const firstCuttingInput = document.getElementById('id_first_cutting_date');
+    const secondCuttingInput = document.getElementById('id_second_cutting_date');
+    const thirdCuttingInput = document.getElementById('id_third_cutting_date');
+    
+    // Make dates work properly
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(input => {
+        // Format the date value from Django format (YYYY-MM-DD) to input format
+        if (input.value) {
+            const date = new Date(input.value);
+            if (date instanceof Date && !isNaN(date)) {
+                const formattedDate = date.toISOString().split('T')[0];
+                input.value = formattedDate;
+            }
+        }
+    });
+    
+    trayForm.addEventListener('submit', function(event) {
+        let isValid = true;
+        
+        // Validate sowing date is not in the future
+        if (sowingDateInput.value) {
+            const sowingDate = new Date(sowingDateInput.value);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            if (sowingDate > today) {
+                alert("Sowing date cannot be in the future.");
+                sowingDateInput.focus();
+                isValid = false;
+            }
+        }
+        
+        // Validate cutting dates are in order
+        if (firstCuttingInput.value && secondCuttingInput.value) {
+            const firstCutting = new Date(firstCuttingInput.value);
+            const secondCutting = new Date(secondCuttingInput.value);
+            
+            if (firstCutting > secondCutting) {
+                alert("Second cutting date must be after first cutting date.");
+                secondCuttingInput.focus();
+                isValid = false;
+            }
+        }
+        
+        if (secondCuttingInput.value && thirdCuttingInput.value) {
+            const secondCutting = new Date(secondCuttingInput.value);
+            const thirdCutting = new Date(thirdCuttingInput.value);
+            
+            if (secondCutting > thirdCutting) {
+                alert("Third cutting date must be after second cutting date.");
+                thirdCuttingInput.focus();
+                isValid = false;
+            }
+        }
+        
+        if (!isValid) {
+            event.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Create User - Kapil Agro{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0"><i class="fas fa-user-plus me-2"></i>Create New User</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="createUserForm">
+                    {% csrf_token %}
+                    
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Create a new user account. You can choose between regular user and admin user types.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.first_name|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.last_name|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.username|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.email|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.phone|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.user_type|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.password1|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.password2|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Create User
+                        </button>
+                        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const userForm = document.getElementById('createUserForm');
+    const usernameInput = document.getElementById('id_username');
+    const passwordInput = document.getElementById('id_password1');
+    const confirmPasswordInput = document.getElementById('id_password2');
+    const emailInput = document.getElementById('id_email');
+    
+    userForm.addEventListener('submit', function(event) {
+        let isValid = true;
+        
+        // Username validation
+        if (usernameInput.value.length < 3) {
+            alert("Username must be at least 3 characters long.");
+            usernameInput.focus();
+            isValid = false;
+        }
+        
+        // Email validation
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(emailInput.value)) {
+            alert("Please enter a valid email address.");
+            emailInput.focus();
+            isValid = false;
+        }
+        
+        // Password match validation
+        if (passwordInput.value !== confirmPasswordInput.value) {
+            alert("Passwords don't match.");
+            confirmPasswordInput.focus();
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            event.preventDefault();
+        }
+    });
+    
+    // Auto-generate username from first and last name
+    const firstNameInput = document.getElementById('id_first_name');
+    const lastNameInput = document.getElementById('id_last_name');
+    
+    function updateUsername() {
+        if (firstNameInput.value && lastNameInput.value) {
+            // Only auto-generate if the username field hasn't been manually edited
+            if (!usernameInput.dataset.edited) {
+                const firstName = firstNameInput.value.toLowerCase();
+                const lastName = lastNameInput.value.toLowerCase();
+                usernameInput.value = (firstName.substring(0, 1) + lastName).replace(/[^a-z0-9]/g, '');
+            }
+        }
+    }
+    
+    firstNameInput.addEventListener('blur', updateUsername);
+    lastNameInput.addEventListener('blur', updateUsername);
+    
+    // Mark username as manually edited
+    usernameInput.addEventListener('input', function() {
+        usernameInput.dataset.edited = 'true';
+    });
+});
+</script>
+{% endblock %}
